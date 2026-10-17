@@ -7,7 +7,7 @@ if not exist ".venv\Scripts\python.exe" (
 )
 ".venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt pyinstaller || goto failed
 
-".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onefile ^
+".venv\Scripts\python.exe" -m PyInstaller --noconfirm --clean --onefile --windowed ^
     --name SpotifySplitter ^
     --icon "%CD%\assets\icon.ico" ^
     --version-file "%CD%\assets\version.txt" ^

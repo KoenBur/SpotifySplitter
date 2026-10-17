@@ -37,7 +37,7 @@ To set it up by hand instead:
 
 ## Build a Windows app
 
-Double-click `build.bat` to build `dist\SpotifySplitter.exe`, a single file that runs on any Windows PC without Python. Opening it starts the site and opens your browser; close its window to stop it. Opening it again while it's running just opens the browser.
+Double-click `build.bat` to build `dist\SpotifySplitter.exe`, a single file that runs on any Windows PC without Python. It opens SpotifySplitter in its own app window (using Windows' built-in Edge WebView2); closing the window stops it. Links to Spotify open in your browser or the Spotify app. To try the app window without building, run `python app.py --window`.
 
 Rebuild after changing the code. An optional `.env` goes next to the `.exe`. The `.exe` isn't signed, so Windows SmartScreen may warn the first time you open it; choose **More info** → **Run anyway**.
 

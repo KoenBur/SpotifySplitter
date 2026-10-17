@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import socket
 import sys
 import threading
 import time
@@ -12,6 +11,7 @@ import httpx
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 from spotify_scraper import NotFoundError, RateLimitedError, SpotifyClient, SpotifyScraperError
+from werkzeug.serving import make_server
 
 import genres
 
@@ -155,24 +155,39 @@ def playlist_genres(playlist_id):
     return jsonify(entry["genres"])
 
 
-def run_desktop(host="127.0.0.1", port=5000):
-    """Start the site and open it in the browser; reuse a copy that's already running."""
-    url = f"http://{host}:{port}/"
-    with socket.socket() as probe:
-        already_running = probe.connect_ex((host, port)) == 0
-    if already_running:
+def run_window():
+    """Run the site on a free local port and show it in its own app window.
+
+    Closing the window stops the app. Without a usable web view the site
+    opens in the browser instead.
+    """
+    # A windowed .exe has no console, so give output somewhere harmless to go.
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
+    server = make_server("127.0.0.1", 0, app, threaded=True)
+    url = f"http://127.0.0.1:{server.server_port}/"
+    try:
+        import webview
+    except ImportError:
         webbrowser.open(url)
+        server.serve_forever()
         return
 
-    logging.getLogger("werkzeug").setLevel(logging.WARNING)
-    print("SpotifySplitter is running at", url)
-    print("Keep this window open while you use it; close it to stop SpotifySplitter.")
-    threading.Timer(1.0, webbrowser.open, args=(url,)).start()
-    app.run(host=host, port=port, threaded=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    webview.create_window("SpotifySplitter", url, width=1280, height=860, min_size=(420, 600))
+    try:
+        webview.start()
+    except Exception:
+        webbrowser.open(url)
+        server.serve_forever()
 
 
 if __name__ == "__main__":
-    if FROZEN:
-        run_desktop()
+    if FROZEN or "--window" in sys.argv:
+        run_window()
     else:
         app.run(debug=os.getenv("FLASK_DEBUG") == "1", threaded=True)
