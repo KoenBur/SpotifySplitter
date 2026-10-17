@@ -1,0 +1,32 @@
+# Builds SpotifySplitter.exe and publishes it as a GitHub release when a
+# version tag such as v1.0.0 is pushed.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the .exe
+        shell: cmd
+        run: |
+          python -m venv .venv
+          build.bat
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SpotifySplitter.exe
+          generate_release_notes: true

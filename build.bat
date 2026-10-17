@@ -18,11 +18,11 @@ if not exist ".venv\Scripts\python.exe" (
 
 echo.
 echo Done: dist\SpotifySplitter.exe
-pause
+if not defined CI pause
 exit /b 0
 
 :failed
 echo.
 echo The build failed; see the messages above.
-pause
+if not defined CI pause
 exit /b 1
