@@ -10,7 +10,7 @@ A small Flask website that loads any public Spotify playlist and suggests ways t
 
 ## Run locally
 
-On Windows run: `start.bat`
+On Windows run: `start.bat` or download the .exe in releases! 
 
 To set it up by hand instead:
 
