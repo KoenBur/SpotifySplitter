@@ -1,7 +1,11 @@
+import logging
 import os
 import re
+import socket
+import sys
 import threading
 import time
+import webbrowser
 from urllib.parse import urlparse
 
 import httpx
@@ -11,9 +15,19 @@ from spotify_scraper import NotFoundError, RateLimitedError, SpotifyClient, Spot
 
 import genres
 
-load_dotenv()
+# Built as an .exe, bundled files are unpacked to a temporary folder, while
+# .env lives next to the .exe itself.
+FROZEN = getattr(sys, "frozen", False)
+BUNDLE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+HOME_DIR = os.path.dirname(sys.executable) if FROZEN else BUNDLE_DIR
 
-app = Flask(__name__)
+load_dotenv(os.path.join(HOME_DIR, ".env"))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BUNDLE_DIR, "templates"),
+    static_folder=os.path.join(BUNDLE_DIR, "static"),
+)
 
 MAX_TRACKS = 1500
 CACHE_SECONDS = 30 * 60
@@ -141,5 +155,24 @@ def playlist_genres(playlist_id):
     return jsonify(entry["genres"])
 
 
+def run_desktop(host="127.0.0.1", port=5000):
+    """Start the site and open it in the browser; reuse a copy that's already running."""
+    url = f"http://{host}:{port}/"
+    with socket.socket() as probe:
+        already_running = probe.connect_ex((host, port)) == 0
+    if already_running:
+        webbrowser.open(url)
+        return
+
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+    print("SpotifySplitter is running at", url)
+    print("Keep this window open while you use it; close it to stop SpotifySplitter.")
+    threading.Timer(1.0, webbrowser.open, args=(url,)).start()
+    app.run(host=host, port=port, threaded=True)
+
+
 if __name__ == "__main__":
-    app.run(debug=os.getenv("FLASK_DEBUG") == "1", threaded=True)
+    if FROZEN:
+        run_desktop()
+    else:
+        app.run(debug=os.getenv("FLASK_DEBUG") == "1", threaded=True)

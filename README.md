@@ -35,6 +35,12 @@ To set it up by hand instead:
 
 5. Open [http://127.0.0.1:5000](http://127.0.0.1:5000) and paste a playlist link.
 
+## Build a Windows app
+
+Double-click `build.bat` to build `dist\SpotifySplitter.exe`, a single file that runs on any Windows PC without Python. Opening it starts the site and opens your browser; close its window to stop it. Opening it again while it's running just opens the browser.
+
+Rebuild after changing the code. An optional `.env` goes next to the `.exe`. The `.exe` isn't signed, so Windows SmartScreen may warn the first time you open it; choose **More info** → **Run anyway**.
+
 ## How it works
 
 Playlists are read from Spotify's public web player data with [SpotifyScraper](https://github.com/AliAkhtari78/SpotifyScraper), the same data anyone can see on open.spotify.com without logging in. Private playlists can't be loaded. Large playlists are capped at the first 1,500 tracks.

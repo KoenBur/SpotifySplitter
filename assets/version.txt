@@ -1,0 +1,16 @@
+# PyInstaller version resource: the details Windows shows under Properties > Details.
+VSVersionInfo(
+  ffi=FixedFileInfo(filevers=(1, 0, 0, 0), prodvers=(1, 0, 0, 0)),
+  kids=[
+    StringFileInfo([
+      StringTable("040904B0", [
+        StringStruct("FileDescription", "SpotifySplitter"),
+        StringStruct("ProductName", "SpotifySplitter"),
+        StringStruct("FileVersion", "1.0.0"),
+        StringStruct("ProductVersion", "1.0.0"),
+        StringStruct("OriginalFilename", "SpotifySplitter.exe"),
+      ])
+    ]),
+    VarFileInfo([VarStruct("Translation", [1033, 1200])]),
+  ],
+)
