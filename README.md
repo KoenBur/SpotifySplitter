@@ -1,8 +1,7 @@
 # SpotifySplitter
-
-Maakt van lange onoverzichtelijke playlist, een suggestie voor kleinere makkelijkere playlist. Volledig AI slop maar werkt wel:
-------------------------------------------------------
-
+---
+Turns long, messy playlists into suggestions for smaller, easier ones. Total AI slop, but it works:
+--- 
 A small Flask website that loads any public Spotify playlist and suggests ways to split it: by genre, artist, popularity, date added or a fixed number of tracks. No Spotify account, developer app or sign-in is needed, and nothing is ever written back to Spotify.
 
 > **Disclaimer:** SpotifySplitter is an independent hobby project. It is not affiliated with, endorsed by or sponsored by Spotify AB. Spotify is a trademark of Spotify AB. The app reads publicly visible playlist data from Spotify's web player, which Spotify's terms of use may not permit; use it at your own risk and for personal use.
