@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#15231c">
+  <title>SpotifySplitter | Make room for the next track</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="wordmark" href="{{ url_for('index') }}" aria-label="SpotifySplitter home">
+      <span class="wordmark-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>spotify<span class="wordmark-light">splitter</span></span>
+    </a>
+    <span class="top-note">Any public playlist · no sign-in</span>
+  </header>
+
+  <main>
+    {% if error %}
+      <div class="notices" role="status"><p class="notice notice-error">{{ error }}</p></div>
+    {% endif %}
+
+    {% macro playlist_form(label) %}
+      <form class="split-form" action="{{ url_for('index') }}" method="get">
+        <label for="spotify-link">{{ label }}</label>
+        <input id="spotify-link" name="playlist" type="text" inputmode="url" value="{{ link }}" placeholder="https://open.spotify.com/playlist/..." autocomplete="url" required>
+        <button class="primary-button" type="submit"><span>Load playlist</span><span aria-hidden="true">↗</span></button>
+        <p class="form-footnote">Works with any public playlist. Private playlists can't be read.</p>
+      </form>
+    {% endmacro %}
+
+    {% if preview %}
+      <section class="workspace">
+        <div class="workspace-main">
+          <p class="eyebrow"><span class="status-dot"></span> READ-ONLY PLAYLIST PREVIEW</p>
+          <h1>Shape the mix.<br><span>Keep the original.</span></h1>
+          <p class="intro">Try different cuts of this playlist. Nothing changes on Spotify; copy a group's links to turn it into a playlist of its own.</p>
+
+          {{ playlist_form("Load another playlist") }}
+
+          <section class="preview-results" aria-labelledby="preview-heading" data-playlist-id="{{ preview.id }}">
+            <div class="preview-heading-row">
+              <div>
+                <p class="panel-label">PLAYLIST PREVIEW</p>
+                <h2 id="preview-heading">{{ preview.name }}</h2>
+                <p class="panel-subtitle">
+                  {{ preview.tracks|length }} tracks{% if preview.owner %} · by {{ preview.owner }}{% endif %} ·
+                  <a href="{{ preview.url }}" target="_blank" rel="noreferrer">Open in Spotify ↗</a>
+                </p>
+              </div>
+              {% if preview.image %}<img class="preview-cover" src="{{ preview.image }}" alt="Cover art for {{ preview.name }}">{% endif %}
+            </div>
+            {% if preview.total_tracks > preview.tracks|length %}
+              <p class="genre-note">This playlist has {{ preview.total_tracks }} items; the preview uses the first {{ preview.tracks|length }} tracks.</p>
+            {% endif %}
+
+            <div class="split-controls">
+              <div class="segmented-control" role="group" aria-label="Preview grouping">
+                <button type="button" class="mode-button" data-mode="count" aria-pressed="true">Track count</button>
+                <button type="button" class="mode-button" data-mode="genre" aria-pressed="false">Genre</button>
+                <button type="button" class="mode-button" data-mode="artist" aria-pressed="false">Artist</button>
+                <button type="button" class="mode-button" data-mode="popularity" aria-pressed="false">Popularity</button>
+                <button type="button" class="mode-button" data-mode="added" aria-pressed="false">Date added</button>
+              </div>
+              <label class="track-limit-control" id="track-limit-control">Tracks per group
+                <input id="track-limit" type="number" min="1" max="1000" value="100" inputmode="numeric">
+              </label>
+              <p class="preview-count" aria-live="polite"><strong id="group-count">0</strong><span id="group-count-label">groups</span></p>
+            </div>
+            <p class="genre-note" id="genre-note" hidden></p>
+            <p class="copy-tip">To make a group a real playlist: press <strong>Copy links</strong>, create an empty playlist in the Spotify desktop app, click into it and paste (Ctrl+V / ⌘V).</p>
+            <div class="preview-groups" id="preview-groups"></div>
+            <script id="preview-tracks" type="application/json">{{ preview.tracks|tojson }}</script>
+          </section>
+        </div>
+
+        <aside class="library-panel" aria-label="Playlist summary">
+          <div class="panel-topline"><span>READ FROM SPOTIFY</span><span class="panel-indicator"></span></div>
+          {% if preview.image %}<img class="feature-art" src="{{ preview.image }}" alt="Cover art for {{ preview.name }}">{% else %}<div class="feature-art art-placeholder" aria-hidden="true"><span>♫</span></div>{% endif %}
+          <p class="panel-label">NOTHING IS SAVED</p>
+          <h2>Just a preview.</h2>
+          <p class="panel-subtitle">The playlist stays exactly as it is.</p>
+          <div class="panel-rule"></div>
+          <p class="panel-note">Genres come from MusicBrainz.<br>Never written back to Spotify.</p>
+          <span class="panel-index">SS / 01</span>
+        </aside>
+      </section>
+    {% else %}
+      <section class="welcome">
+        <div class="welcome-copy">
+          <p class="eyebrow"><span class="status-dot"></span> YOUR MUSIC, RE-CUT</p>
+          <h1>Make room<br>for the <em>next</em><br>track.</h1>
+          <p class="intro">Paste any public Spotify playlist and see it split by genre, artist, popularity or length. The original stays exactly as it is.</p>
+          {{ playlist_form("Spotify playlist link") }}
+        </div>
+        <aside class="welcome-art" aria-label="A live music crowd">
+          <div class="art-copy"><span>GOOD MUSIC<br>SHOULD KEEP<br>ON GOING.</span><span class="art-number">01 / ∞</span></div>
+          <div class="art-caption"><span>PLAYLIST TOOL / EST. TODAY</span><span>INDEPENDENTLY IN RHYTHM</span></div>
+        </aside>
+      </section>
+    {% endif %}
+  </main>
+  <footer class="footer"><span>SPOTIFYSPLITTER</span><span>MADE FOR THE LONG WAY HOME</span></footer>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
