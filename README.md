@@ -25,7 +25,7 @@ To set it up by hand instead:
    python -m pip install -r requirements.txt
    ```
 
-3. Optionally copy `.env.example` to `.env` and fill in `MUSICBRAINZ_CONTACT` with an email address or URL. MusicBrainz asks API clients to identify themselves this way.
+3. Optionally create a `.env` file containing `MUSICBRAINZ_CONTACT=` followed by an email address or URL. MusicBrainz asks API clients to identify themselves this way.
 
 4. Start the site:
 
