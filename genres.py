@@ -17,6 +17,7 @@ import re
 import threading
 import time
 from collections import Counter, defaultdict
+from typing import NamedTuple
 
 import httpx
 from spotify_scraper import AsyncSpotifyClient, RateLimit, SpotifyScraperError
@@ -26,10 +27,27 @@ MUSICBRAINZ_BATCH = 100
 SPOTIFY_PARTNER_HOST = "api-partner.spotify.com"
 RELATED_FOR_GENRES = 6
 MAX_INFERRED_ARTISTS = 150
-MAX_GROUPS = 8
-MERGE_SIMILARITY = 0.35
-ATTACH_SIMILARITY = 0.15
 ACRONYMS = {"r&b", "edm", "idm", "ebm", "uk", "dnb"}
+
+
+class DetailLevel(NamedTuple):
+    merge_similarity: float  # stop merging clusters below this similarity
+    max_groups: int  # ...unless there are more groups than this
+    min_share: float  # smallest group, as a share of the playlist
+    min_tracks: int  # smallest group, in tracks
+    attach_similarity: float  # small clusters join the group whose profile is at least this similar
+    broaden: float  # credit "pop rock" gives to "pop" and "rock"
+    rarity: float  # how much genres shared by most of the playlist are weighed down
+
+
+DETAIL_LEVELS = {
+    1: DetailLevel(0.25, 5, 0.06, 4, 0.10, 0.6, 0.0),
+    2: DetailLevel(0.35, 8, 0.04, 3, 0.10, 0.5, 0.3),
+    3: DetailLevel(0.45, 12, 0.02, 3, 0.10, 0.4, 0.6),
+    4: DetailLevel(0.55, 20, 0.015, 3, 0.15, 0.25, 0.8),
+    5: DetailLevel(0.65, 30, 0.008, 2, 0.20, 0.15, 1.0),
+}
+DEFAULT_DETAIL = 3
 
 
 def _user_agent():
@@ -171,7 +189,7 @@ def collect_artist_genres(artist_ids):
     return artist_genres, related
 
 
-def _broaden(genres, known_genres):
+def _broaden(genres, known_genres, share):
     """Give broad genres partial credit, so "pop rock" also counts toward "pop" and "rock"."""
     broadened = Counter()
     for genre, weight in genres.items():
@@ -181,7 +199,7 @@ def _broaden(genres, known_genres):
             for start in range(len(words) - size + 1):
                 part = " ".join(words[start:start + size])
                 if part in known_genres and part != genre:
-                    broadened[part] = max(broadened[part], 0.5 * weight)
+                    broadened[part] = max(broadened[part], share * weight)
     return broadened
 
 
@@ -201,12 +219,13 @@ def _label(genre):
     return label[0].upper() + label[1:]
 
 
-def _cluster(profiles, sizes, min_size):
+def _cluster(profiles, sizes, min_size, level):
     """Average-linkage clustering of artist genre profiles, weighted by track count.
 
     Merging stops once no two clusters are similar enough, but continues past
-    that point while there are more than ``MAX_GROUPS`` clusters of ``min_size``
-    tracks or more. Returns ``(members, similarity)`` for the surviving clusters.
+    that point while there are more than ``level.max_groups`` clusters of
+    ``min_size`` tracks or more. Returns ``(members, sizes)`` for the surviving
+    clusters.
     """
     keys = list(profiles)
     members = {index: [key] for index, key in enumerate(keys)}
@@ -228,7 +247,7 @@ def _cluster(profiles, sizes, min_size):
         if left not in alive or right not in alive:
             continue
         large = sum(1 for index in alive if sizes[index] >= min_size)
-        if -score < MERGE_SIMILARITY and large <= MAX_GROUPS:
+        if -score < level.merge_similarity and large <= level.max_groups:
             break
         merged = next_index
         next_index += 1
@@ -241,7 +260,7 @@ def _cluster(profiles, sizes, min_size):
                 similarity[merged][other] = similarity[other][merged] = score
                 heapq.heappush(heap, (-score, merged, other))
         alive.add(merged)
-    return {index: members[index] for index in alive}, {index: sizes[index] for index in alive}, similarity
+    return {index: members[index] for index in alive}, {index: sizes[index] for index in alive}
 
 
 def _name_groups(groups, vectors):
@@ -255,29 +274,38 @@ def _name_groups(groups, vectors):
                 mean[genre] += weight / top / len(uris)
         means.append(mean)
 
-    rankings = []
+    # A genre describes a group well when it's common there and less common in
+    # the group where it's next strongest.
+    scores = []
     for index, mean in enumerate(means):
-        others = [other for position, other in enumerate(means) if position != index]
-        rest = Counter()
-        for other in others:
-            for genre, weight in other.items():
-                rest[genre] += weight / max(len(others), 1)
-        rankings.append(sorted(mean, key=lambda genre: -(mean[genre] - rest[genre])))
+        strongest_elsewhere = Counter()
+        for position, other in enumerate(means):
+            if position != index:
+                for genre, weight in other.items():
+                    strongest_elsewhere[genre] = max(strongest_elsewhere[genre], weight)
+        scores.append({genre: mean[genre] - 0.5 * strongest_elsewhere[genre] for genre in mean})
+    rankings = [sorted(score, key=score.get, reverse=True) for score in scores]
 
-    names, used = [], set()
-    for ranking in rankings:
-        genre = next((genre for genre in ranking if genre not in used), ranking[0])
-        used.add(genre)
-        names.append(genre)
-    return names, [ranking[:4] for ranking in rankings]
+    # Hand out names best fit first, so each genre goes to the group it suits most.
+    names, used = [None] * len(groups), set()
+    candidates = sorted(((score, index, genre) for index, score_by_genre in enumerate(scores)
+                         for genre, score in score_by_genre.items()), reverse=True)
+    for _, index, genre in candidates:
+        if names[index] is None and genre not in used:
+            names[index] = genre
+            used.add(genre)
+    names = [name or ranking[0] for name, ranking in zip(names, rankings)]
+    return names, [[name] + [genre for genre in ranking if genre != name][:3] for name, ranking in zip(names, rankings)]
 
 
-def suggest_genre_groups(tracks):
+def suggest_genre_groups(tracks, detail=DEFAULT_DETAIL):
     """Suggest genre groups for tracks shaped like ``{"uri", "artist_ids"}``.
 
+    ``detail`` runs from 1 (a few broad groups) to 5 (many specific ones).
     Returns the groups, largest first, followed by "Other genres" and
     "No genre found" groups for tracks that fit no suggestion.
     """
+    level = DETAIL_LEVELS[detail]
     artist_ids = list(dict.fromkeys(artist_id for track in tracks for artist_id in track["artist_ids"]))
     artist_genres, related = collect_artist_genres(artist_ids)
     known_genres = musicbrainz.genre_names()
@@ -286,7 +314,7 @@ def suggest_genre_groups(tracks):
     for track in tracks:
         vector = Counter()
         for position, artist_id in enumerate(track["artist_ids"]):
-            for genre, weight in _broaden(artist_genres.get(artist_id, {}), known_genres).items():
+            for genre, weight in _broaden(artist_genres.get(artist_id, {}), known_genres, level.broaden).items():
                 vector[genre] += (1.0 if position == 0 else 0.5) * weight
         primary = track["artist_ids"][0] if track["artist_ids"] else None
         if vector:
@@ -300,18 +328,39 @@ def suggest_genre_groups(tracks):
         total = Counter()
         for uri in uris:
             total.update(vectors[uri])
-        profiles[artist_id] = _unit(total)
+        profiles[artist_id] = total
 
-    min_size = max(3, round(len(tracks) * 0.04))
-    clusters, sizes, similarity = _cluster(profiles, {key: len(uris) for key, uris in tracks_by_artist.items()}, min_size)
-    large = [index for index in clusters if sizes[index] >= min_size]
+    # Genres most of the playlist shares ("rock" in a rock playlist) say little
+    # about how to split it, so specific levels weigh them down.
+    spread = Counter(genre for profile in profiles.values() for genre in profile)
+    rarity = {genre: math.log((1 + len(profiles)) / count) ** level.rarity for genre, count in spread.items()}
+    profiles = {
+        artist_id: _unit({genre: weight * rarity[genre] for genre, weight in profile.items()})
+        for artist_id, profile in profiles.items()
+    }
+
+    min_size = max(level.min_tracks, round(len(tracks) * level.min_share))
+    sizes = {artist_id: len(uris) for artist_id, uris in tracks_by_artist.items()}
+    clusters, cluster_sizes = _cluster(profiles, sizes, min_size, level)
+
+    def centroid(artist_list):
+        total = Counter()
+        for artist_id in artist_list:
+            for genre, weight in profiles[artist_id].items():
+                total[genre] += weight * sizes[artist_id]
+        return _unit(total)
+
+    large = [index for index in clusters if cluster_sizes[index] >= min_size]
     artists_in = {index: list(clusters[index]) for index in large}
+    centroids = {index: centroid(clusters[index]) for index in large}
     leftover_artists = []
     for index in clusters:
         if index in large:
             continue
-        best = max(large, key=lambda other: similarity[index].get(other, 0), default=None)
-        if best is not None and similarity[index].get(best, 0) >= ATTACH_SIMILARITY:
+        # Small clusters join the group whose overall genre profile they resemble most.
+        own = centroid(clusters[index])
+        best = max(large, key=lambda other: _cosine(own, centroids[other]), default=None)
+        if best is not None and _cosine(own, centroids[best]) >= level.attach_similarity:
             artists_in[best] += clusters[index]
         else:
             leftover_artists += clusters[index]
@@ -327,9 +376,8 @@ def suggest_genre_groups(tracks):
             no_genre += uris
 
     groups = []
-    for index, artist_list in artists_in.items():
-        uris = [uri for artist_id in artist_list for uri in tracks_by_artist.get(artist_id, []) + unknown_by_artist.get(artist_id, [])]
-        groups.append(uris)
+    for artist_list in artists_in.values():
+        groups.append([uri for artist_id in artist_list for uri in tracks_by_artist.get(artist_id, []) + unknown_by_artist.get(artist_id, [])])
     groups.sort(key=len, reverse=True)
     names, top_genres = _name_groups([[uri for uri in uris if uri in vectors] for uris in groups], vectors)
 
@@ -344,6 +392,7 @@ def suggest_genre_groups(tracks):
         result.append({"name": "No genre found", "genres": [], "uris": no_genre})
     return {
         "groups": result,
+        "detail": detail,
         "artists": len(artist_ids),
         "artists_with_genres": sum(1 for artist_id in artist_ids if artist_genres.get(artist_id)),
     }

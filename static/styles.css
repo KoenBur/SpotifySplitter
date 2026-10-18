@@ -86,6 +86,8 @@ h1 em { color: #6c9441; font-style: normal; }
 .mode-button[aria-pressed="true"] { background: var(--ink); color: white; }
 .track-limit-control { display: flex; flex-direction: column; gap: 6px; color: #535f55; font-size: 11px; font-weight: 600; }
 .track-limit-control input { width: 100px; min-height: 40px; padding: 0 10px; border: 1px solid #cdd3c8; background: #f9faf6; color: var(--ink); }
+.detail-slider { min-height: 40px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 10px; font-weight: 500; }
+.track-limit-control .detail-slider input { width: 120px; min-height: 0; padding: 0; border: 0; background: none; accent-color: #6c9441; }
 .preview-count { min-height: 40px; display: flex; flex-direction: column; justify-content: center; color: var(--muted); font-family: var(--mono); font-size: 9px; text-transform: uppercase; }
 .preview-count strong { color: var(--ink); font-family: var(--sans); font-size: 20px; }
 .genre-note { margin: 12px 0; padding: 10px 12px; border-left: 2px solid #789653; background: #e7eddf; color: #4d5f46; font-size: 11px; line-height: 1.5; }

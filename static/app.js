@@ -6,6 +6,10 @@ const groupCount = document.querySelector("#group-count");
 const groupCountLabel = document.querySelector("#group-count-label");
 const genreNote = document.querySelector("#genre-note");
 const modeButtons = document.querySelectorAll(".mode-button");
+const genreDetail = document.querySelector("#genre-detail");
+const genreDetailControl = document.querySelector("#genre-detail-control");
+
+const DETAIL_NAMES = ["Broadest", "Broad", "Balanced", "Specific", "Most specific"];
 
 const POPULARITY_TIERS = [
   [100_000_000, "Smash hits", "100M+ plays"],
@@ -24,7 +28,7 @@ if (previewData && previewGroups) {
   const playlistId = previewResults.dataset.playlistId;
   let mode = "count";
   let genreGroups;
-  let genreRequest;
+  const genreRequests = new Map();
 
   function appendTrack(group, track) {
     const row = document.createElement("a");
@@ -176,29 +180,42 @@ if (previewData && previewGroups) {
     renderGroups(groups, "genre groups");
   }
 
-  async function loadGenres() {
-    if (genreGroups) return true;
-    genreNote.hidden = false;
-    genreNote.textContent = "Looking up artist genres on MusicBrainz… Large playlists can take up to a minute.";
-    previewGroups.replaceChildren();
-    groupCount.textContent = "–";
-    groupCountLabel.textContent = "genre groups";
-    try {
-      genreRequest ??= fetch(`/api/playlists/${encodeURIComponent(playlistId)}/genres`).then(async (response) => {
+  function requestGenres(detail) {
+    if (!genreRequests.has(detail)) {
+      const url = `/api/playlists/${encodeURIComponent(playlistId)}/genres?detail=${detail}`;
+      genreRequests.set(detail, fetch(url).then(async (response) => {
         const result = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(result.error || "The genre lookup didn't complete. Please try again.");
         return result;
       }, () => {
         throw new Error("We couldn't reach the server for the genre lookup. Please try again.");
-      });
-      genreGroups = await genreRequest;
-      genreNote.textContent = `Genres found for ${genreGroups.artists_with_genres} of ${genreGroups.artists} artists, `
+      }));
+    }
+    return genreRequests.get(detail);
+  }
+
+  async function showGenres() {
+    const detail = Number(genreDetail.value);
+    genreDetail.setAttribute("aria-valuetext", DETAIL_NAMES[detail - 1]);
+    genreNote.hidden = false;
+    genreNote.textContent = genreGroups
+      ? "Regrouping…"
+      : "Looking up artist genres on MusicBrainz… Large playlists can take up to a minute.";
+    if (!genreGroups) {
+      previewGroups.replaceChildren();
+      groupCount.textContent = "–";
+      groupCountLabel.textContent = "genre groups";
+    }
+    try {
+      const result = await requestGenres(detail);
+      if (mode !== "genre" || Number(genreDetail.value) !== detail) return;
+      genreGroups = result;
+      genreNote.textContent = `Genres found for ${result.artists_with_genres} of ${result.artists} artists, `
         + "from MusicBrainz tags and related artists on Spotify. Treat the groups as suggestions.";
-      return true;
+      renderGenreGroups();
     } catch (error) {
-      genreRequest = undefined;
-      genreNote.textContent = error.message;
-      return false;
+      genreRequests.delete(detail);
+      if (mode === "genre" && Number(genreDetail.value) === detail) genreNote.textContent = error.message;
     }
   }
 
@@ -210,12 +227,13 @@ if (previewData && previewGroups) {
   };
 
   modeButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
+    button.addEventListener("click", () => {
       mode = button.dataset.mode;
       modeButtons.forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
       trackLimit.closest(".track-limit-control").hidden = mode !== "count";
+      genreDetailControl.hidden = mode !== "genre";
       if (mode === "genre") {
-        if (await loadGenres() && mode === "genre") renderGenreGroups();
+        showGenres();
       } else {
         genreNote.hidden = true;
         renderers[mode]();
@@ -225,6 +243,10 @@ if (previewData && previewGroups) {
 
   trackLimit.addEventListener("input", () => {
     if (mode === "count") renderCountGroups();
+  });
+
+  genreDetail.addEventListener("change", () => {
+    if (mode === "genre") showGenres();
   });
 
   renderCountGroups();

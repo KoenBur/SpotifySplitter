@@ -41,7 +41,7 @@ To set it up by hand instead:
 
 Playlists are read from Spotify's public web player data with [SpotifyScraper](https://github.com/AliAkhtari78/SpotifyScraper), the same data anyone can see on open.spotify.com without logging in. Private playlists can't be loaded. Large playlists are capped at the first 1,500 tracks.
 
-Spotify's public data has no genres, so the genre split looks artists up on [MusicBrainz](https://musicbrainz.org/), the community music database, through the Spotify links stored there. Artists MusicBrainz doesn't know borrow genres from their related artists on Spotify. Artists are then clustered by genre profile and every group is named after the genre that sets it apart. Results are suggestions, and the first lookup for a large playlist can take up to a minute because MusicBrainz allows one request per second.
+Spotify's public data has no genres, so the genre split looks artists up on [MusicBrainz](https://musicbrainz.org/), the community music database, through the Spotify links stored there. Artists MusicBrainz doesn't know borrow genres from their related artists on Spotify. Artists are then clustered by genre profile and every group is named after the genre that sets it apart. A **Broad ↔ Specific** slider picks the level of detail: broad gives a handful of groups like "Rock" and "Electronic"; specific splits them into styles like "Art rock", "French house" or "Dream pop", and weighs down genres most of the playlist shares. Results are suggestions, and the first lookup for a large playlist can take up to a minute because MusicBrainz allows one request per second.
 
 To turn a group into a real playlist, press **Copy links**, create an empty playlist in the Spotify desktop app, click into it and paste.
 

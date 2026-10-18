@@ -70,6 +70,13 @@
               <label class="track-limit-control" id="track-limit-control">Tracks per group
                 <input id="track-limit" type="number" min="1" max="1000" value="100" inputmode="numeric">
               </label>
+              <label class="track-limit-control genre-detail-control" id="genre-detail-control" hidden>Genres
+                <span class="detail-slider">
+                  <span aria-hidden="true">Broad</span>
+                  <input id="genre-detail" type="range" min="1" max="5" step="1" value="3" aria-valuetext="Balanced">
+                  <span aria-hidden="true">Specific</span>
+                </span>
+              </label>
               <p class="preview-count" aria-live="polite"><strong id="group-count">0</strong><span id="group-count-label">groups</span></p>
             </div>
             <p class="genre-note" id="genre-note" hidden></p>

@@ -111,7 +111,7 @@ def load_playlist(playlist_id):
     with _cache_lock:
         if len(_cache) >= 50:
             _cache.pop(min(_cache, key=lambda key: _cache[key]["loaded"]))
-        _cache[playlist_id] = {"loaded": time.monotonic(), "playlist": playlist, "genres": None}
+        _cache[playlist_id] = {"loaded": time.monotonic(), "playlist": playlist, "genres": {}}
     return playlist
 
 
@@ -146,13 +146,16 @@ def playlist_genres(playlist_id):
     entry = _cached(playlist_id) if PLAYLIST_ID.fullmatch(playlist_id) else None
     if not entry:
         return jsonify(error="Load the playlist again before looking up genres."), 404
-    if entry["genres"] is None:
+    detail = request.args.get("detail", genres.DEFAULT_DETAIL, type=int)
+    if detail not in genres.DETAIL_LEVELS:
+        detail = genres.DEFAULT_DETAIL
+    if detail not in entry["genres"]:
         try:
-            entry["genres"] = genres.suggest_genre_groups(entry["playlist"]["tracks"])
+            entry["genres"][detail] = genres.suggest_genre_groups(entry["playlist"]["tracks"], detail)
         except (httpx.HTTPError, SpotifyScraperError) as exc:
             app.logger.warning("Genre lookup failed: %s", exc)
             return jsonify(error="The genre lookup didn't complete. Please try again in a moment."), 502
-    return jsonify(entry["genres"])
+    return jsonify(entry["genres"][detail])
 
 
 def run_window():
